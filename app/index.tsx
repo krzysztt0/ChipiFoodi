@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,12 +7,11 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  ImageBackground, // Użyjemy dla tła kategorii
+  ImageBackground,
 } from 'react-native';
-// Będziesz potrzebował biblioteki ikon, np. react-native-vector-icons
-// import Icon from 'react-native-vector-icons/Ionicons';
+import { selectRecipesByGoal } from './store/recipes';
+import { toggleUserGoal, useUserGoals, type DietGoal } from './store/userGoals';
 
-// Przykładowe dane, żeby listy miały co wyświetlić
 const CATEGORIES = [
   { id: '1', name: 'Śniadania', image: 'https://via.placeholder.com/150' },
   { id: '2', name: 'Obiady', image: 'https://via.placeholder.com/150' },
@@ -20,153 +19,170 @@ const CATEGORIES = [
   { id: '4', name: 'Przekąski', image: 'https://via.placeholder.com/150' },
 ];
 
-const RECIPES = [
+const GOALS: {
+  id: DietGoal;
+  label: string;
+  emoji: string;
+  chipClasses: {
+    base: string;
+    active: string;
+  };
+}[] = [
   {
-    id: 'r1',
-    title: 'Szybka zupa z soczewicy',
-    price: '$2.50',
-    calories: '450',
-    isHealthy: true,
-    isCheap: true,
-    image: 'https://via.placeholder.com/300',
+    id: 'balanced',
+    label: 'Zdrowe',
+    emoji: '🥦',
+    chipClasses: {
+      base: 'bg-green-100 border border-green-300',
+      active: 'bg-green-500 border-green-600',
+    },
   },
   {
-    id: 'r2',
-    title: 'Tost z awokado i jajkiem',
-    price: '$1.50',
-    calories: '350',
-    isHealthy: true,
-    isCheap: true,
-    image: 'https://via.placeholder.com/300',
+    id: 'budget',
+    label: 'Tanie',
+    emoji: '💰',
+    chipClasses: {
+      base: 'bg-yellow-100 border border-yellow-300',
+      active: 'bg-yellow-400 border-yellow-500',
+    },
   },
   {
-    id: 'r3',
-    title: 'Patelnia z kurczakiem i ryżem',
-    price: '$3.00',
-    calories: '550',
-    isHealthy: true,
-    isCheap: false,
-    image: 'https://via.placeholder.com/300',
+    id: 'quick',
+    label: 'Szybkie',
+    emoji: '⏱️',
+    chipClasses: {
+      base: 'bg-blue-100 border border-blue-300',
+      active: 'bg-blue-400 border-blue-500',
+    },
   },
 ];
 
-// Musisz zaimportować swoją ikonę, tutaj jest jako placeholder
-const SearchIcon = () => <Text>🔍</Text>; 
+const goalLabels: Record<DietGoal, string> = {
+  balanced: 'Zdrowe',
+  budget: 'Tanie',
+  quick: 'Szybkie',
+};
+
+const goalBadgeStyles: Record<DietGoal, string> = {
+  balanced: 'bg-green-100 border border-green-300 text-green-800',
+  budget: 'bg-yellow-100 border border-yellow-300 text-yellow-800',
+  quick: 'bg-blue-100 border border-blue-300 text-blue-800',
+};
+
+const SearchIcon = () => <Text>🔍</Text>;
 
 const HomeScreen = () => {
-  // --- Komponent nagłówka dla FlatList ---
-  // Zawiera wszystko OPRÓCZ listy "Polecane przepisy"
+  const selectedGoal = useUserGoals();
+
+  const recipes = useMemo(
+    () => selectRecipesByGoal(selectedGoal),
+    [selectedGoal],
+  );
+
   const renderHeader = () => (
     <View className="px-4 pt-2.5">
-      {/* 1. Nagłówek i Wyszukiwarka */}
       <Text className="text-3xl font-bold text-gray-900">
         Znajdź zdrowy posiłek
       </Text>
 
-      <View className="flex-row items-center bg-gray-100 rounded-xl px-3 mt-4">
-        {/* <Icon name="search-outline" size={20} color="#888" /> */}
+      <View className="mt-4 flex-row items-center rounded-xl bg-gray-100 px-3">
         <SearchIcon />
         <TextInput
           placeholder="Szukaj przepisów..."
-          className="flex-1 py-3 ml-2 text-base"
+          className="ml-2 flex-1 py-3 text-base"
         />
       </View>
 
-      {/* 2. Szybkie Filtry (Kluczowa funkcja!) */}
-      <View className="flex-row mt-4">
-        <TouchableOpacity className="bg-green-100 py-2 px-4 rounded-full mr-2 border border-green-300">
-          <Text className="font-semibold text-green-800">🥦 Zdrowe</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-yellow-100 py-2 px-4 rounded-full mr-2 border border-yellow-300">
-          <Text className="font-semibold text-yellow-800">💰 Tanie</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="bg-blue-100 py-2 px-4 rounded-full border border-blue-300">
-          <Text className="font-semibold text-blue-800">⏱️ Szybkie</Text>
-        </TouchableOpacity>
+      <View className="mt-4 flex-row">
+        {GOALS.map(({ id, label, emoji, chipClasses }) => {
+          const isActive = selectedGoal === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              className={`mr-2 rounded-full px-4 py-2 ${
+                chipClasses[isActive ? 'active' : 'base']
+              }`}
+              onPress={() => toggleUserGoal(id)}
+            >
+              <Text
+                className={`font-semibold ${
+                  isActive ? 'text-white' : 'text-gray-800'
+                }`}
+              >
+                {emoji} {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* 3. Kategorie (Lista pozioma) */}
-      <Text className="text-xl font-bold mt-6 mb-3">Kategorie</Text>
+      <Text className="mt-6 mb-3 text-xl font-bold">Kategorie</Text>
       <FlatList
         data={CATEGORIES}
         keyExtractor={(item) => item.id}
         horizontal={true}
         showsHorizontalScrollIndicator={false}
-        // Używamy ujemnego marginesu i paddingu, aby lista zaczynała się od krawędzi
-        className="-ml-4 pl-4" 
+        className="-ml-4 pl-4"
         renderItem={({ item }) => (
-          // To jest "CategoryCard"
-          <TouchableOpacity className="w-24 h-24 rounded-lg mr-3 overflow-hidden">
+          <TouchableOpacity className="mr-3 h-24 w-24 overflow-hidden rounded-lg">
             <ImageBackground
               source={{ uri: item.image }}
               resizeMode="cover"
               className="flex-1"
             >
-              {/* Nakładka dla czytelności tekstu */}
-              <View className="flex-1 justify-end p-2 bg-black/30">
-                <Text className="text-white font-bold text-sm">
-                  {item.name}
-                </Text>
+              <View className="flex-1 justify-end bg-black/30 p-2">
+                <Text className="text-sm font-bold text-white">{item.name}</Text>
               </View>
             </ImageBackground>
           </TouchableOpacity>
         )}
       />
 
-      <Text className="text-xl font-bold mt-6 mb-3">Polecane dla Ciebie</Text>
+      <Text className="mt-6 mb-3 text-xl font-bold">Polecane dla Ciebie</Text>
     </View>
   );
 
-  // --- Główny komponent ---
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* 4. Lista Polecanych Przepisów (Główna lista pionowa) */}
       <FlatList
-        data={RECIPES}
+        data={recipes}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader} // Tutaj wstrzykujemy całą górną sekcję
+        ListHeaderComponent={renderHeader}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-          // To jest "RecipeCard"
           <TouchableOpacity
-            className="mb-6 px-4" // Dodajemy padding poziomy tutaj, bo lista go nie ma
+            className="mb-6 px-4"
             onPress={() => {
               /* Nawigacja do ekranu szczegółów */
             }}
           >
-            <View className="rounded-xl overflow-hidden shadow-lg bg-white border border-gray-100">
-              <Image source={{ uri: item.image }} className="w-full h-48" />
+            <View className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+              <Image source={{ uri: item.image }} className="h-48 w-full" />
 
-              {/* Tagi "Zdrowe" / "Tanie" na obrazku */}
-              <View className="absolute top-3 left-3 flex-row">
-                {item.isHealthy && (
-                  <View className="bg-green-100 px-2 py-1 rounded-full mr-1.5 border border-green-300">
-                    <Text className="text-green-800 text-xs font-bold">
-                      Zdrowe
+              <View className="absolute left-3 top-3 flex-row flex-wrap">
+                {item.goals.map((goal) => (
+                  <View
+                    key={`${item.id}-${goal}`}
+                    className={`mr-1.5 mb-1.5 rounded-full px-2 py-1 ${goalBadgeStyles[goal]}`}
+                  >
+                    <Text className="text-xs font-bold">
+                      {goalLabels[goal]}
                     </Text>
                   </View>
-                )}
-                {item.isCheap && (
-                  <View className="bg-yellow-100 px-2 py-1 rounded-full border border-yellow-300">
-                    <Text className="text-yellow-800 text-xs font-bold">
-                      Tanie
-                    </Text>
-                  </View>
-                )}
+                ))}
               </View>
 
-              {/* Zawartość karty (tekst) */}
               <View className="p-3">
-                <Text className="text-lg font-bold text-gray-900 mb-1">
+                <Text className="mb-1 text-lg font-bold text-gray-900">
                   {item.title}
                 </Text>
-                {/* Statystyki przepisu */}
-                <View className="flex-row justify-between items-center mt-1">
+                <View className="mt-1 flex-row items-center justify-between">
                   <Text className="text-sm text-gray-600">
                     Kalorie: <Text className="font-bold">{item.calories}</Text>
                   </Text>
                   <Text className="text-sm text-gray-600">
-                    Cena: <Text className="font-bold text-green-700">{item.price}</Text>
+                    Cena:{' '}
+                    <Text className="font-bold text-green-700">{item.price}</Text>
                   </Text>
                 </View>
               </View>
